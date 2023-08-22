@@ -1,0 +1,7 @@
+BEGIN;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS hashtags;
+DROP TABLE IF EXISTS user_projects;
+DROP TABLE IF EXISTS project_hashtags;
+COMMIT;
