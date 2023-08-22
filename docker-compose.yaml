@@ -1,0 +1,59 @@
+version: '3.7'
+services:
+  postgres:
+    image: postgres:13-alpine
+    container_name: postgres
+    restart: on-failure
+    environment:
+      POSTGRES_DB: db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: secret
+    ports:
+      - 4532:5432
+    networks:
+      - all-in-one
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.15.1
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+    ports:
+      - "9200:9200"
+    networks:
+      - all-in-one
+    depends_on:
+      - postgres
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - directory=pipeline
+    restart: on-failure
+    container_name: pipeline
+    networks:
+      - all-in-one
+    depends_on:
+      - postgres
+      - elasticsearch
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - directory=server
+    restart: on-failure
+    container_name: server
+    ports:
+      - "8080:8080"
+    networks:
+      - all-in-one
+    depends_on:
+      - elasticsearch
+
+networks:
+  all-in-one:
+    driver: bridge

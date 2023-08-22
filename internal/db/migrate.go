@@ -7,10 +7,11 @@ import (
 	"pg-to-es/internal/config"
 
 	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
-const migrationVersion = 96
+const version = 1
 
 //go:embed migrations/*.sql
 var files embed.FS
@@ -24,7 +25,7 @@ func Migrate(cfg config.Pg) error {
 	if err != nil {
 		return fmt.Errorf("migrate.NewWithSourceInstance() failed, err: %w", err)
 	}
-	if err := m.Migrate(migrationVersion); err != nil {
+	if err := m.Migrate(version); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
 			return nil
 		}

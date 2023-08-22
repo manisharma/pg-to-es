@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -35,6 +34,12 @@ func main() {
 		log.Fatalln("config.Load() failed, err:", err.Error())
 	}
 
+	// Run Migrations (if any)
+	err = db.Migrate(cfg.Pg)
+	if err != nil {
+		log.Fatalf("db.Migrate() failed, err: %s", err)
+	}
+
 	// Initiate Listening
 	listener, err := db.NewListener(cfg.Pg)
 	if err != nil {
@@ -62,7 +67,6 @@ func main() {
 					if err != nil {
 						log.Printf("json.Unmarshal() failed, err: %v", err)
 					}
-					fmt.Println(u)
 					// TODO: sync to es
 				case "projects":
 					var p model.Project
@@ -70,7 +74,6 @@ func main() {
 					if err != nil {
 						log.Printf("json.Unmarshal() failed, err: %v", err)
 					}
-					fmt.Println(p)
 					// TODO: sync to es
 				case "hashtags":
 					var h model.Hashtag
@@ -78,7 +81,6 @@ func main() {
 					if err != nil {
 						log.Printf("json.Unmarshal() failed, err: %v", err)
 					}
-					fmt.Println(h)
 					// TODO: sync to es
 				}
 			}

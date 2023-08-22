@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/url"
 	"time"
 
 	"github.com/ardanlabs/conf/v2"
@@ -31,6 +32,7 @@ type Pg struct {
 	Username                     string        `conf:"required"`
 	Password                     string        `conf:"required"`
 	DbName                       string        `conf:"required"`
+	DisableTLS                   bool          `conf:"default:true"`
 	MaxIdleTimeForConns          time.Duration `conf:"default:30s"`
 	MaxLifetimeForConns          time.Duration `conf:"default:1m"`
 	MaxIdleConns                 int           `conf:"default:100"`
@@ -41,8 +43,21 @@ type Pg struct {
 }
 
 func (pg Pg) String() string {
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		pg.Host, pg.Port, pg.Username, pg.Password, pg.DbName)
+	sslMode := "require"
+	if pg.DisableTLS {
+		sslMode = "disable"
+	}
+	q := make(url.Values)
+	q.Set("sslmode", sslMode)
+	q.Set("timezone", "utc")
+	u := url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(pg.Username, pg.Password),
+		Host:     pg.Host,
+		Path:     pg.DbName,
+		RawQuery: q.Encode(),
+	}
+	return u.String()
 }
 
 func Load(prefix string) (App, error) {

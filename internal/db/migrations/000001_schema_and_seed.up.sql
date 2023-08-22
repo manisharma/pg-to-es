@@ -1,5 +1,7 @@
 BEGIN;
+--*******
 -- Create tables
+--*******
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name VARCHAR,
@@ -27,7 +29,84 @@ CREATE TABLE user_projects (
     user_id INT REFERENCES users(id) ON DELETE CASCADE,
     PRIMARY KEY (project_id, user_id)
 );
+--*******
+-- Create Notification Function
+--*******
+CREATE OR REPLACE FUNCTION notify_trigger() RETURNS TRIGGER AS $$ BEGIN IF (TG_OP = 'INSERT') THEN PERFORM pg_notify(
+        'core_db_event',
+        json_build_object(
+            'operation',
+            'insert',
+            'table',
+            TG_TABLE_NAME,
+            'payload',
+            row_to_json(NEW)
+        )::text
+    );
+ELSIF (TG_OP = 'UPDATE') THEN PERFORM pg_notify(
+    'core_db_event',
+    json_build_object(
+        'operation',
+        'update',
+        'table',
+        TG_TABLE_NAME,
+        'payload',
+        row_to_json(NEW)
+    )::text
+);
+ELSIF (TG_OP = 'DELETE') THEN PERFORM pg_notify(
+    'core_db_event',
+    json_build_object(
+        'operation',
+        'delete',
+        'table',
+        TG_TABLE_NAME,
+        'payload',
+        row_to_json(OLD)
+    )::text
+);
+END IF;
+RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+--*******
+-- Create Triggers
+--*******
+CREATE TRIGGER user_notify
+AFTER
+INSERT
+    OR
+UPDATE
+    OR DELETE ON users FOR EACH ROW EXECUTE PROCEDURE notify_trigger(
+        'id',
+        'name',
+        'created_at'
+    );
+CREATE TRIGGER hashtag_notify
+AFTER
+INSERT
+    OR
+UPDATE
+    OR DELETE ON hashtags FOR EACH ROW EXECUTE PROCEDURE notify_trigger(
+        'id',
+        'name',
+        'created_at'
+    );
+CREATE TRIGGER project_notify
+AFTER
+INSERT
+    OR
+UPDATE
+    OR DELETE ON projects FOR EACH ROW EXECUTE PROCEDURE notify_trigger(
+        'id',
+        'name',
+        'slug',
+        'description',
+        'created_at'
+    );
+--*******
 -- Seed the tables with random data
+--*******
 INSERT INTO users (name, created_at)
 SELECT 'User ' || generate_series(1, 10),
     NOW() - (random() * interval '365 days');
@@ -51,7 +130,7 @@ SELECT (
         ORDER BY random()
         LIMIT 1
     )
-FROM generate_series(1, 30);
+FROM generate_series(1, 30) ON CONFLICT (hashtag_id, project_id) DO NOTHING;
 INSERT INTO user_projects (project_id, user_id)
 SELECT (
         SELECT id
@@ -64,5 +143,5 @@ SELECT (
         ORDER BY random()
         LIMIT 1
     )
-FROM generate_series(1, 20);
+FROM generate_series(1, 20) ON CONFLICT (project_id, user_id) DO NOTHING;
 COMMIT;
