@@ -22,6 +22,16 @@ type Hashtag struct {
 	CreatedAt string `json:"created_at"`
 }
 
+type UserProject struct {
+	ProjectId int    `json:"project_id"`
+	UserId    string `json:"user_id"`
+}
+
+type ProjectHashtag struct {
+	ProjectId int `json:"project_id"`
+	HashtagId int `json:"hashtag_id"`
+}
+
 type SearchResult struct {
 	Project Project `json:"project"`
 	User    User    `json:"user"`
