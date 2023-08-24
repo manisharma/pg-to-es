@@ -54,6 +54,7 @@ func (s *Server) Root(w http.ResponseWriter, r *http.Request) {
 		"To search for projects created by a particular user visit": "/search/user/{userID}",
 		"To search for projects that use specific hashtags visit":   "/search/hashtags/{hashtag}",
 		"To do full-text fuzzy search for projects visit":           "/search/fuzzy/{query}",
+		"To view all indexed documents":                             "/all",
 	}
 	encode(w, res)
 }
