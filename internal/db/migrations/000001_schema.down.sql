@@ -1,3 +1,6 @@
+--*******
+-- Remove functions, triggers & tables
+--*******
 BEGIN;
 DROP TRIGGER IF EXISTS user_notify on users;
 DROP TRIGGER IF EXISTS hashtag_notify on hashtags;

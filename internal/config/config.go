@@ -19,7 +19,8 @@ type App struct {
 }
 
 type Es struct {
-	Host string `conf:"required"`
+	Host  string `conf:"required"`
+	Index string `conf:"default:root"`
 }
 
 type Server struct {
@@ -60,7 +61,7 @@ func (pg Pg) String() string {
 	return u.String()
 }
 
-func Load(prefix string) (App, error) {
+func Load() (App, error) {
 	cfg := App{
 		Version: conf.Version{
 			Build: "develop",
@@ -71,7 +72,7 @@ func Load(prefix string) (App, error) {
 	if err != nil {
 		log.Fatalln("error loading .env file", err)
 	}
-	help, err := conf.Parse(prefix, &cfg)
+	help, err := conf.Parse("", &cfg)
 	if err != nil {
 		err = fmt.Errorf("conf.Parse() failed: %w", err)
 		if errors.Is(err, conf.ErrHelpWanted) {

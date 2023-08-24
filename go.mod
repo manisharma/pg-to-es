@@ -5,7 +5,7 @@ go 1.21.0
 require (
 	github.com/ardanlabs/conf/v2 v2.2.0
 	github.com/golang-migrate/migrate/v4 v4.16.2
-	github.com/jmoiron/sqlx v1.3.5
+	github.com/gorilla/mux v1.7.4
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
 	github.com/olivere/elastic v6.2.37+incompatible

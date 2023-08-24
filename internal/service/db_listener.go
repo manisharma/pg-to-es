@@ -1,4 +1,4 @@
-package db
+package service
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/lib/pq"
 )
 
-type Listener struct {
+type DbListener struct {
 	cfg         config.Pg
 	lstnr       *pq.Listener
 	deltaStream chan string
@@ -17,7 +17,7 @@ type Listener struct {
 }
 
 // Initialize Listener
-func NewListener(cfg config.Pg) (*Listener, error) {
+func NewDbListener(cfg config.Pg) (*DbListener, error) {
 	var listenerErr error
 	listener := pq.NewListener(cfg.String(), cfg.ListenerMinReconnectInterval,
 		cfg.ListenerMaxReconnectInterval, func(event pq.ListenerEventType, err error) {
@@ -28,7 +28,7 @@ func NewListener(cfg config.Pg) (*Listener, error) {
 	if listenerErr != nil {
 		return nil, listenerErr
 	}
-	return &Listener{
+	return &DbListener{
 		cfg:         cfg,
 		lstnr:       listener,
 		deltaStream: make(chan string),
@@ -36,7 +36,7 @@ func NewListener(cfg config.Pg) (*Listener, error) {
 }
 
 // Start Listening to CRUD operations
-func (l *Listener) Start(ctx context.Context) (<-chan string, error) {
+func (l *DbListener) Start(ctx context.Context) (<-chan string, error) {
 	err := l.lstnr.Listen(l.cfg.ListenerChannel)
 	if err != nil {
 		return nil, err
@@ -46,14 +46,14 @@ func (l *Listener) Start(ctx context.Context) (<-chan string, error) {
 }
 
 // Stop listening
-func (l *Listener) Stop() {
+func (l *DbListener) Stop() {
 	l.closeOnce.Do(func() {
 		close(l.deltaStream)
 		l.lstnr.Close()
 	})
 }
 
-func (l *Listener) listen(ctx context.Context) {
+func (l *DbListener) listen(ctx context.Context) {
 	for {
 		select {
 		case n := <-l.lstnr.Notify:
