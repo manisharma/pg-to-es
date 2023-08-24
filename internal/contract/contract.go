@@ -14,9 +14,9 @@ type Elastic interface {
 	RemoveHashtag(ctx context.Context, index string, hashtagId int) error
 	Update(ctx context.Context, index string, id int, user model.User) error
 	Delete(ctx context.Context, index string, id int) error
-	SearchByUser(ctx context.Context, index string, userID int) ([]model.SearchResult, error)
-	SearchByHashtags(ctx context.Context, index string, hashtag string) ([]model.SearchResult, error)
-	FuzzySearchProjects(ctx context.Context, index string, query string) ([]model.SearchResult, error)
+	SearchByUser(ctx context.Context, index string, userID int) (*model.User, error)
+	SearchByHashtags(ctx context.Context, index string, hashtag string) ([]model.User, error)
+	FuzzySearchProjects(ctx context.Context, index string, query string) ([]model.FuzzyResult, error)
 }
 
 type DbListener interface {

@@ -7,7 +7,7 @@ import (
 	"pg-to-es/internal/config"
 	"pg-to-es/internal/model"
 
-	"github.com/olivere/elastic"
+	"github.com/olivere/elastic/v7"
 )
 
 type Elastic struct {
@@ -37,66 +37,38 @@ func (c *Elastic) Create(ctx context.Context, index string, id int, doc model.Us
 }
 
 func (c *Elastic) GetByProjectId(ctx context.Context, index string, projectId int) ([]model.User, error) {
-	userAgg := elastic.NewNestedAggregation().Path("user")
-	projectAgg := elastic.NewNestedAggregation().Path("user.projects")
-	hashtagAgg := elastic.NewNestedAggregation().Path("user.projects.hashtags")
-	hashtagQuery := elastic.NewNestedQuery("user.projects.hashtags",
-		elastic.NewTermQuery("user.projects.id", projectId))
-
-	searchResult, err := c.c.Search().
-		Index(index).
-		Query(hashtagQuery).
-		Aggregation("user", userAgg).
-		Aggregation("projects", projectAgg).
-		Aggregation("hashtags", hashtagAgg).
-		Size(10).
-		Do(ctx)
+	query := elastic.NewTermQuery("projects.id", projectId)
+	searchService := c.c.Search().Index(index).Query(query)
+	searchResult, err := searchService.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
-	// Process and return the search results
 	var results []model.User
 	for _, hit := range searchResult.Hits.Hits {
 		var result model.User
-		var m map[string]interface{}
-		err := json.Unmarshal(*hit.Source, &m)
+		err := json.Unmarshal(hit.Source, &result)
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println(m)
 		results = append(results, result)
 	}
 	return results, nil
 }
 
 func (c *Elastic) GetByHashTagId(ctx context.Context, index string, hashTagId int) ([]model.User, error) {
-	userAgg := elastic.NewNestedAggregation().Path("user")
-	projectAgg := elastic.NewNestedAggregation().Path("user.projects")
-	hashtagAgg := elastic.NewNestedAggregation().Path("user.projects.hashtags")
-	hashtagQuery := elastic.NewNestedQuery("user.projects.hashtags",
-		elastic.NewTermQuery("user.projects.hashtags.id", hashTagId))
-
-	searchResult, err := c.c.Search().
-		Index(index).
-		Query(hashtagQuery).
-		Aggregation("user", userAgg).
-		Aggregation("projects", projectAgg).
-		Aggregation("hashtags", hashtagAgg).
-		Size(10).
-		Do(ctx)
+	query := elastic.NewTermQuery("projects.hashtags.id", hashTagId)
+	searchService := c.c.Search().Index(index).Query(query)
+	searchResult, err := searchService.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
-	// Process and return the search results
 	var results []model.User
 	for _, hit := range searchResult.Hits.Hits {
 		var result model.User
-		var m map[string]interface{}
-		err := json.Unmarshal(*hit.Source, &m)
+		err := json.Unmarshal(hit.Source, &result)
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println(m)
 		results = append(results, result)
 	}
 	return results, nil
@@ -114,7 +86,7 @@ func (c *Elastic) GetByUserId(ctx context.Context, index string, userId int) (*m
 	}
 	if doc.Found {
 		var u model.User
-		err = json.Unmarshal(*doc.Source, &u)
+		err = json.Unmarshal(doc.Source, &u)
 		if err != nil {
 			return nil, err
 		}
@@ -124,73 +96,62 @@ func (c *Elastic) GetByUserId(ctx context.Context, index string, userId int) (*m
 }
 
 func (c *Elastic) RemoveProject(ctx context.Context, index string, projectId int) error {
-	// Create a script to remove the project from the array
-	script := elastic.NewScript("ctx._source.user.projects.removeIf(p -> p.id == params.projectId)")
-	script.Params(map[string]interface{}{
-		"projectId": projectId,
-	})
-
-	// Create an update by query request
-	updateByQueryRequest := c.c.UpdateByQuery().
-		Index(index).                                               // Replace with your actual index name
-		Query(elastic.NewTermQuery("user.projects.id", projectId)). // Match documents with the specified project ID
-		Script(script)                                              // Use the script to remove the project from the array
-
-	// Execute the update by query request
-	updateResult, err := updateByQueryRequest.Do(ctx)
+	documents, err := c.GetByProjectId(ctx, index, projectId)
 	if err != nil {
 		return err
 	}
-
-	// Check the update result
-	if updateResult.Updated == 0 {
-		return fmt.Errorf("No documents updated.")
+	for _, document := range documents {
+		remainigProjects := []model.Project{}
+		for _, project := range document.Projects {
+			if project.ID != projectId {
+				remainigProjects = append(remainigProjects, project)
+			}
+		}
+		document.Projects = remainigProjects
+		err = c.Update(ctx, index, document.ID, document)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 func (c *Elastic) RemoveHashtag(ctx context.Context, index string, hashtagId int) error {
-	// Create a script to remove the project from the array
-	script := elastic.NewScript("ctx._source.user.projects.hashtags.removeIf(p -> p.id == params.hashtagId)")
-	script.Params(map[string]interface{}{
-		"hashtagId": hashtagId,
-	})
-
-	// Create an update by query request
-	updateByQueryRequest := c.c.UpdateByQuery().
-		Index(index).                                                        // Replace with your actual index name
-		Query(elastic.NewTermQuery("user.projects.hashtags.id", hashtagId)). // Match documents with the specified hashtag ID
-		Script(script)                                                       // Use the script to remove the project from the array
-
-	// Execute the update by query request
-	updateResult, err := updateByQueryRequest.Do(ctx)
+	documents, err := c.GetByHashTagId(ctx, index, hashtagId)
 	if err != nil {
 		return err
 	}
-
-	// Check the update result
-	if updateResult.Updated == 0 {
-		return fmt.Errorf("No documents updated.")
+	for idx, document := range documents {
+		for idx2, project := range document.Projects {
+			remainigHashtags := []model.Hashtag{}
+			for _, hashtag := range project.Hashtags {
+				if hashtag.ID != hashtagId {
+					remainigHashtags = append(remainigHashtags, hashtag)
+				}
+			}
+			documents[idx].Projects[idx2].Hashtags = remainigHashtags
+			err = c.Update(ctx, index, document.ID, documents[idx])
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
 
 // Function to update a document
 func (c *Elastic) Update(ctx context.Context, index string, id int, user model.User) error {
-	// Create an update request for the specific document by its project ID
 	updateResult, err := c.c.Update().
-		Index(index).              // Replace with your actual index name
-		Id(fmt.Sprintf("%d", id)). // Convert projectID to string and use it as the document ID
-		Type("_doc").              // The document type (usually "_doc" for Elasticsearch 7.x)
-		Doc(user).                 // Use the update script to modify the document
+		Index(index).
+		Id(fmt.Sprintf("%d", id)).
+		Type("_doc").
+		Doc(user).
 		Do(ctx)
 	if err != nil {
 		return err
 	}
-
-	// Check the update result
 	if updateResult.Result == "updated" {
-		return fmt.Errorf("Project with ID %d updated successfully.\n", id)
+		return nil
 	} else if updateResult.Result == "noop" {
 		return fmt.Errorf("No changes made for project with ID %d.\n", id)
 	} else {
@@ -208,106 +169,62 @@ func (c *Elastic) Delete(ctx context.Context, index string, id int) error {
 	return err
 }
 
-func (c *Elastic) SearchByUser(ctx context.Context, index string, userID int) ([]model.SearchResult, error) {
-	userQuery := elastic.NewTermQuery("user.id", userID)
-	userAgg := elastic.NewNestedAggregation().Path("user")
-	projectAgg := elastic.NewNestedAggregation().Path("user.projects")
-	hashtagAgg := elastic.NewNestedAggregation().Path("user.projects.hashtags")
+func (c *Elastic) SearchByUser(ctx context.Context, index string, userID int) (*model.User, error) {
+	return c.GetByUserId(ctx, index, userID)
+}
 
-	searchResult, err := c.c.Search().
-		Index(index).
-		Query(userQuery).
-		Aggregation("user", userAgg).
-		Aggregation("projects", projectAgg).
-		Aggregation("hashtags", hashtagAgg).
-		Size(10).
-		Do(ctx)
+func (c *Elastic) SearchByHashtags(ctx context.Context, index string, hashtag string) ([]model.User, error) {
+	query := elastic.NewQueryStringQuery(fmt.Sprintf("_source.projects.hashtags.name=%s", hashtag))
+	searchService := c.c.Search().Index(index).Query(query)
+	searchResult, err := searchService.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	// Process and return the search results
-	var results []model.SearchResult
+	var results []model.User
 	for _, hit := range searchResult.Hits.Hits {
-		var result model.SearchResult
-		var m map[string]interface{}
-		err := json.Unmarshal(*hit.Source, &m)
+		var result model.User
+		err := json.Unmarshal(hit.Source, &result)
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println(m)
 		results = append(results, result)
 	}
 	return results, nil
 }
 
-func (c *Elastic) SearchByHashtags(ctx context.Context, index string, hashtag string) ([]model.SearchResult, error) {
-	userAgg := elastic.NewNestedAggregation().Path("user")
-	projectAgg := elastic.NewNestedAggregation().Path("user.projects")
-	hashtagAgg := elastic.NewNestedAggregation().Path("user.projects.hashtags")
-	hashtagQuery := elastic.NewNestedQuery("user.projects.hashtags",
-		elastic.NewTermQuery("user.projects.hashtags.name", hashtag))
-
-	searchResult, err := c.c.Search().
-		Index(index).
-		Query(hashtagQuery).
-		Aggregation("user", userAgg).
-		Aggregation("projects", projectAgg).
-		Aggregation("hashtags", hashtagAgg).
-		Size(10).
-		Do(ctx)
-	if err != nil {
-		return nil, err
-	}
-	// Process and return the search results
-	var results []model.SearchResult
-	for _, hit := range searchResult.Hits.Hits {
-		var result model.SearchResult
-		var m map[string]interface{}
-		err := json.Unmarshal(*hit.Source, &m)
-		if err != nil {
-			return nil, err
-		}
-		fmt.Println(m)
-		results = append(results, result)
-	}
-	return results, nil
-}
-
-func (c *Elastic) FuzzySearchProjects(ctx context.Context, index string, query string) ([]model.SearchResult, error) {
-	userAgg := elastic.NewNestedAggregation().Path("user")
-	projectAgg := elastic.NewNestedAggregation().Path("user.projects")
-	hashtagAgg := elastic.NewNestedAggregation().Path("user.projects.hashtags")
-	fuzzyQuery := elastic.NewBoolQuery().
+func (c *Elastic) FuzzySearchProjects(ctx context.Context, index string, query string) ([]model.FuzzyResult, error) {
+	qry := elastic.NewBoolQuery().
 		Should(
-			elastic.NewFuzzyQuery("user.projects.slug", "desired_search_term").
-				Boost(2.0),
-			elastic.NewFuzzyQuery("user.projects.description", "desired_search_term").
-				Boost(1.0))
-
-	searchResult, err := c.c.Search().
-		Index(index).
-		Query(fuzzyQuery).
-		Aggregation("user", userAgg).
-		Aggregation("projects", projectAgg).
-		Aggregation("hashtags", hashtagAgg).
-		Size(10).
-		Do(ctx)
+			elastic.NewFuzzyQuery("projects.slug", query).
+				Fuzziness(5),
+			elastic.NewFuzzyQuery("projects.description", query).
+				Fuzziness(5))
+	searchService := c.c.Search().Query(qry)
+	searchResult, err := searchService.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	// Process and return the search results
-	var results []model.SearchResult
+	var results []model.FuzzyResult
 	for _, hit := range searchResult.Hits.Hits {
-		var result model.SearchResult
-		var m map[string]interface{}
-		err := json.Unmarshal(*hit.Source, &m)
+		var user model.User
+		err := json.Unmarshal(hit.Source, &user)
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println(m)
-		results = append(results, result)
+		hashtags := []string{}
+		for _, project := range user.Projects {
+			for _, hashtag := range project.Hashtags {
+				hashtags = append(hashtags, hashtag.Name)
+			}
+		}
+		results = append(results, model.FuzzyResult{
+			Hashtags: hashtags,
+			User: model.FuzzyUser{
+				ID:        user.ID,
+				Name:      user.Name,
+				CreatedAt: user.CreatedAt,
+			},
+		})
 	}
 	return results, nil
 }

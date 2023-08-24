@@ -32,7 +32,13 @@ type ProjectHashtag struct {
 	HashtagId int `json:"hashtag_id"`
 }
 
-type SearchResult struct {
-	Project Project `json:"project"`
-	User    User    `json:"user"`
+type FuzzyResult struct {
+	Hashtags []string  `json:"hastags"`
+	User     FuzzyUser `json:"user"`
+}
+
+type FuzzyUser struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at"`
 }
