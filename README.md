@@ -4,7 +4,13 @@ pg-to-es - is a project housing 2 binaries - a `pipeline` to sync CRUD operation
 
 ## How to use `pg-to-es`?
 
-Both the binaries are self contained and ready to be run by using `Docker`, which means you need to have `Docker` up and `running`. At bare minimum it needs an environment file named `.env`, (which is by-default created when you use `make up`) with following contents
+Both the binaries are self contained and ready to be run by using `Docker`, which means you need to have `Docker` up and `running`. At bare minimum it needs an environment file named `.env`, (which is by-default created when you use `make up`) with following contents.
+
+`PostgresSQL` schema will be created (during `make up`) but database will not be seeded. This is intentional, as `elasticsearch` containers is not ready by the time `seed` runs in `postgresql`. See [Improvements](#improvements)
+
+
+**Thus we have to manually seed the data by using contents from [000002_seed.up.sql](internal/db/migrations/000002_seed.up.sql)**
+
 
 ```.env
 PG_HOST=postgres # postgresql host
@@ -37,3 +43,7 @@ to tear down
 ```sh
   make down
 ```
+
+<a id="improvements"></a>
+### Improvements
+Use shock absorber (`Message Queue`) in pipeline to retain delta during all in one boot up (`make up`).
