@@ -16,7 +16,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	interruptStream := make(chan os.Signal)
+	interruptStream := make(chan os.Signal, 1)
 	signal.Notify(interruptStream, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(interruptStream)
 

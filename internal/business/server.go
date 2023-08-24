@@ -31,6 +31,7 @@ func NewServer(es contract.Elastic, port int, esIndex string) *Server {
 func (s *Server) InitRoutes() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", s.Root).Methods("GET")
+	r.HandleFunc("/all", s.GetAll).Methods("GET")
 	r.HandleFunc("/search/user/{userID}", s.SearchProjectsByUser).Methods("GET")
 	r.HandleFunc("/search/hashtags/{hashtag}", s.SearchProjectsByHashtag).Methods("GET")
 	r.HandleFunc("/search/fuzzy/{query}", s.FuzzySearchProjects).Methods("GET")
@@ -53,6 +54,15 @@ func (s *Server) Root(w http.ResponseWriter, r *http.Request) {
 		"To search for projects created by a particular user visit": "/search/user/{userID}",
 		"To search for projects that use specific hashtags visit":   "/search/hashtags/{hashtag}",
 		"To do full-text fuzzy search for projects visit":           "/search/fuzzy/{query}",
+	}
+	encode(w, res)
+}
+
+func (s *Server) GetAll(w http.ResponseWriter, r *http.Request) {
+	res, err := s.es.GetByProjectId(r.Context(), s.esIndex, 0)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	encode(w, res)
 }

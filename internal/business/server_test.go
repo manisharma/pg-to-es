@@ -170,6 +170,76 @@ func TestServer_Root(t *testing.T) {
 	}
 }
 
+func TestServer_GetAll(t *testing.T) {
+	now := time.Now().Format(time.RFC3339)
+	esMock := mock.NewElastic([]model.User{
+		model.User{
+			ID:        1,
+			Name:      "Test user",
+			CreatedAt: now,
+			Projects: []model.Project{
+				model.Project{
+					ID:          1,
+					Name:        "Test project",
+					Slug:        "Test project slug",
+					Description: "Test project description",
+					CreatedAt:   now,
+					Hashtags: []model.Hashtag{
+						model.Hashtag{
+							ID:        1,
+							Name:      "TestHashTag",
+							CreatedAt: now,
+						},
+					},
+				},
+			},
+		},
+	})
+	server := NewServer(esMock, 0, "")
+	server.InitRoutes()
+	type fields struct {
+		srv     *http.Server
+		es      contract.Elastic
+		esIndex string
+	}
+	type args struct {
+		method string
+		target string
+		body   io.Reader
+		vars   map[string]string
+	}
+	tests := []struct {
+		name         string
+		fields       fields
+		args         args
+		returnStatus int
+	}{
+		{
+			name: "should return 200 OK and all users present in engine",
+			fields: fields{
+				srv:     server.srv,
+				es:      esMock,
+				esIndex: "",
+			},
+			args: args{
+				method: http.MethodGet,
+				target: "/all",
+				body:   nil,
+			},
+			returnStatus: http.StatusOK,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(tt.args.method, tt.args.target, tt.args.body)
+			req = mux.SetURLVars(req, tt.args.vars)
+			server.GetAll(w, req)
+			assert.Equal(t, tt.returnStatus, w.Code, "status code must match")
+		})
+	}
+}
+
 func TestServer_SearchProjectsByUser(t *testing.T) {
 	now := time.Now().Format(time.RFC3339)
 	esMock := mock.NewElastic([]model.User{

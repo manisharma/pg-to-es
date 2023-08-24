@@ -37,8 +37,16 @@ func (c *Elastic) Create(ctx context.Context, index string, id int, doc model.Us
 }
 
 func (c *Elastic) GetByProjectId(ctx context.Context, index string, projectId int) ([]model.User, error) {
-	query := elastic.NewTermQuery("projects.id", projectId)
-	searchService := c.c.Search().Index(index).Query(query)
+	var (
+		query         *elastic.TermQuery
+		searchService *elastic.SearchService
+	)
+	if projectId != 0 {
+		query = elastic.NewTermQuery("projects.id", projectId)
+		searchService = c.c.Search().Index(index).Query(query)
+	} else {
+		searchService = c.c.Search().Index(index)
+	}
 	searchResult, err := searchService.Do(ctx)
 	if err != nil {
 		return nil, err
