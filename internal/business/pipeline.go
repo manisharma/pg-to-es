@@ -64,8 +64,6 @@ func process(ctx context.Context, es contract.Elastic, deltaStream <-chan string
 				continue
 			}
 
-			log.Println("an update from db", d.Operation)
-
 			switch d.Operation {
 			case "INSERT", "UPDATE":
 				var delta document
